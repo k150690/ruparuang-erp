@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Contact {
+  id             String          @id @default(uuid())
+  contactId      String          @unique
+  name           String
+  type           String          // BUSINESS, INDIVIDUAL, VENDOR
+  city           String
+  creditLimit    Float           @default(0)
+  paymentTerms   String          // PT-CASH, PT-7, PT-14
+  category       String?         // Khusus Vendor
+  salesOrders    SalesOrder[]
+  quotations     Quotation[]
+  purchaseOrders PurchaseOrder[]
+  vendorBills    VendorBill[]
+  invoices       Invoice[]
+}
+
+model Product {
+  sku             String              @id
+  name            String
+  uom             String              @default("Unit")
+  salesPrice      Float
+  cost            Float
+  defaultVendorId String
+  taxCode         String              @default("PPN-E11")
+  stocks          Stock[]
+  quotationLines  QuotationLine[]
+  soLines         SalesOrderLine[]
+  poLines         PurchaseOrderLine[]
+  doLines         DeliveryOrderLine[]
+  invoiceLines    InvoiceLine[]
+  billLines       VendorBillLine[]
+  posLines        POSOrderLine[]
+}
+
+model Warehouse {
+  locationId String  @id
+  name       String
+  type       String
+  city       String
+  stocks     Stock[]
+}
+
+model Stock {
+  id          String    @id @default(uuid())
+  sku         String
+  locationId  String
+  qtyOnHand   Int       @default(0)
+  qtyReserved Int       @default(0)
+  product     Product   @relation(fields: [sku], references: [sku])
+  warehouse   Warehouse @relation(fields: [locationId], references: [locationId])
+
+  @@unique([sku, locationId])
+}
+
+model Account {
+  code         String        @id
+  name         String
+  type         String
+  journalLines JournalLine[]
+}
+
+model Quotation {
+  id          String          @id @default(uuid())
+  docNumber   String          @unique
+  customerId  String
+  status      String          @default("Draft")
+  subtotal    Float
+  taxAmount   Float
+  totalAmount Float
+  customer    Contact         @relation(fields: [customerId], references: [id])
+  lines       QuotationLine[]
+  createdAt   DateTime        @default(now())
+}
+
+model QuotationLine {
+  id          String    @id @default(uuid())
+  quotationId String
+  sku         String
+  qty         Int
+  unitPrice   Float
+  subtotal    Float
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
+  product     Product   @relation(fields: [sku], references: [sku])
+}
+
+model SalesOrder {
+  id          String           @id @default(uuid())
+  docNumber   String           @unique
+  customerId  String
+  status      String           @default("Draft")
+  subtotal    Float
+  taxAmount   Float
+  totalAmount Float
+  customer    Contact          @relation(fields: [customerId], references: [id])
+  lines       SalesOrderLine[]
+  deliveries  DeliveryOrder[]
+  invoices    Invoice[]
+  createdAt   DateTime         @default(now())
+}
+
+model SalesOrderLine {
+  id           String     @id @default(uuid())
+  salesOrderId String
+  sku          String
+  qtyOrdered   Int
+  qtyDelivered Int        @default(0)
+  qtyInvoiced  Int        @default(0)
+  unitPrice    Float
+  subtotal     Float
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id])
+  product      Product    @relation(fields: [sku], references: [sku])
+}
+
+model PurchaseOrder {
+  id          String              @id @default(uuid())
+  docNumber   String              @unique
+  vendorId    String
+  status      String              @default("Draft")
+  subtotal    Float
+  taxAmount   Float
+  totalAmount Float
+  vendor      Contact             @relation(fields: [vendorId], references: [id])
+  lines       PurchaseOrderLine[]
+  vendorBills VendorBill[]
+  createdAt   DateTime            @default(now())
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  sku             String
+  qtyOrdered      Int
+  qtyReceived     Int           @default(0)
+  qtyBilled       Int           @default(0)
+  unitPrice       Float
+  subtotal        Float
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  product         Product       @relation(fields: [sku], references: [sku])
+}
+
+model DeliveryOrder {
+  id           String              @id @default(uuid())
+  docNumber    String              @unique
+  salesOrderId String
+  status       String              @default("Draft")
+  salesOrder   SalesOrder          @relation(fields: [salesOrderId], references: [id])
+  lines        DeliveryOrderLine[]
+  createdAt    DateTime            @default(now())
+}
+
+model DeliveryOrderLine {
+  id              String        @id @default(uuid())
+  deliveryOrderId String
+  sku             String
+  qtyDone         Int
+  deliveryOrder   DeliveryOrder @relation(fields: [deliveryOrderId], references: [id])
+  product         Product       @relation(fields: [sku], references: [sku])
+}
+
+model Invoice {
+  id           String        @id @default(uuid())
+  docNumber    String        @unique
+  salesOrderId String?
+  customerId   String
+  status       String        @default("Draft")
+  subtotal     Float
+  taxAmount    Float
+  totalAmount  Float
+  customer     Contact       @relation(fields: [customerId], references: [id])
+  salesOrder   SalesOrder?   @relation(fields: [salesOrderId], references: [id])
+  lines        InvoiceLine[]
+  createdAt    DateTime      @default(now())
+}
+
+model InvoiceLine {
+  id        String   @id @default(uuid())
+  invoiceId String
+  sku       String
+  qty       Int
+  unitPrice Float
+  subtotal  Float
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  product   Product  @relation(fields: [sku], references: [sku])
+}
+
+model VendorBill {
+  id              String           @id @default(uuid())
+  docNumber       String           @unique
+  purchaseOrderId String?
+  vendorId        String
+  status          String           @default("Draft")
+  subtotal        Float
+  taxAmount       Float
+  totalAmount     Float
+  vendor          Contact          @relation(fields: [vendorId], references: [id])
+  purchaseOrder   PurchaseOrder?  @relation(fields: [purchaseOrderId], references: [id])
+  lines           VendorBillLine[]
+  createdAt       DateTime         @default(now())
+}
+
+model VendorBillLine {
+  id           String     @id @default(uuid())
+  vendorBillId String
+  sku          String
+  qty          Int
+  unitPrice    Float
+  subtotal     Float
+  vendorBill   VendorBill @relation(fields: [vendorBillId], references: [id])
+  product      Product    @relation(fields: [sku], references: [sku])
+}
+
+model JournalEntry {
+  id        String        @id @default(uuid())
+  docNumber String        @unique
+  date      DateTime      @default(now())
+  ref       String?
+  lines     JournalLine[]
+}
+
+model JournalLine {
+  id             String       @id @default(uuid())
+  journalEntryId String
+  accountCode    String
+  debit          Float        @default(0)
+  credit         Float        @default(0)
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id])
+  account        Account      @relation(fields: [accountCode], references: [code])
+}
+
+model POSSession {
+  id              String     @id @default(uuid())
+  sessionNumber   String     @unique
+  cashierName     String
+  status          String     @default("Open")
+  startBalance    Float
+  countedBalance  Float?
+  expectedBalance Float?
+  variance        Float?
+  varianceReason  String?
+  orders          POSOrder[]
+  openedAt        DateTime   @default(now())
+  closedAt        DateTime?
+}
+
+model POSOrder {
+  id          String         @id @default(uuid())
+  sessionId   String
+  docNumber   String         @unique
+  subtotal    Float
+  taxAmount   Float
+  totalAmount Float
+  paidAmount  Float
+  change      Float
+  session     POSSession     @relation(fields: [sessionId], references: [id])
+  lines       POSOrderLine[]
+  createdAt   DateTime       @default(now())
+}
+
+model POSOrderLine {
+  id         String   @id @default(uuid())
+  posOrderId String
+  sku        String
+  qty        Int
+  unitPrice  Float
+  subtotal   Float
+  posOrder   POSOrder @relation(fields: [posOrderId], references: [id])
+  product    Product  @relation(fields: [sku], references: [sku])
+}
+model Lead {
+  id          String   @id @default(uuid())
+  title       String
+  contactName String
+  email       String?
+  phone       String?
+  value       Float    @default(0)
+  stage       String   @default("New") // Options: New, Qualified, Proposition, Won, Lost
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
